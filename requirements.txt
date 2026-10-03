@@ -1,0 +1,19 @@
+# Core (required)
+fastapi>=0.110
+uvicorn>=0.29
+pandas>=2.0
+numpy>=1.24
+scipy>=1.10
+scikit-learn>=1.3
+nltk>=3.8
+matplotlib>=3.7
+requests>=2.31
+tqdm>=4.66
+
+# Neural ranker (recommended). Without it the project falls back to an
+# LSA / char-n-gram "semantic" model so everything still runs.
+sentence-transformers>=2.7
+
+# Tests (optional)
+pytest>=8.0
+httpx>=0.27

@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Book Search · Book-Crossing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --paper:#f8fafc; --card:#ffffff;
+  --indigo:#4338ca; --indigo-soft:#e0e7ff; --indigo-ink:#312e81;
+  --c-tfidf:#94a3b8; --c-bm25:#2563eb; --c-semantic:#d97706; --c-hybrid:#4338ca;
+  --mark:#fde68a; --good:#047857;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --serif:"Newsreader",Georgia,"Times New Roman",serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{--ink:#e2e8f0;--muted:#94a3b8;--line:#243044;--paper:#0b1220;--card:#111a2e;
+    --indigo:#818cf8;--indigo-soft:#1e2552;--indigo-ink:#c7d2fe;--mark:#713f12;--good:#34d399;
+    --c-tfidf:#64748b;--c-bm25:#60a5fa;--c-semantic:#fbbf24;--c-hybrid:#818cf8}
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font:15px/1.5 var(--sans);color:var(--ink);background:var(--paper);min-height:100vh;display:flex;flex-direction:column}
+a{color:var(--indigo)}
+:focus-visible{outline:2px solid var(--indigo);outline-offset:2px;border-radius:4px}
+.wrap{width:100%;max-width:1180px;margin:0 auto;padding:0 20px}
+
+header{padding:26px 0 0}
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}
+h1{font:600 30px/1.15 var(--serif);margin:0;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:4px 0 0}
+.badge{background:var(--indigo-soft);color:var(--indigo-ink);border-radius:999px;padding:5px 14px;font-weight:500;font-size:13px}
+nav{display:flex;gap:4px;margin-top:22px;border-bottom:1px solid var(--line)}
+nav button{background:none;border:0;padding:10px 16px;font:500 14px var(--sans);color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+nav button[aria-selected=true]{color:var(--indigo);border-color:var(--indigo)}
+nav button:hover{color:var(--ink)}
+
+main{flex:1;padding:24px 0 40px}
+.panel{display:none}.panel.active{display:block}
+
+.searchbar{display:flex;gap:10px}
+.searchbar input{flex:1;font:400 18px var(--sans);padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
+.searchbar button,.btn{font:500 15px var(--sans);background:var(--indigo);color:#fff;border:0;border-radius:10px;padding:0 22px;cursor:pointer}
+@media (prefers-color-scheme:dark){.searchbar button,.btn{color:#0b1220}}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)}
+.seg button{border:0;background:none;padding:8px 14px;font:500 14px var(--sans);color:var(--muted);cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed=true]{background:var(--indigo-soft);color:var(--indigo-ink)}
+.hint{color:var(--muted);font-size:14px}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:4px 12px;font:400 13px var(--sans);cursor:pointer}
+.chip:hover{border-color:var(--indigo);color:var(--indigo)}
+.explain{margin:16px 0 0;padding:12px 16px;border-left:3px solid var(--indigo);background:var(--card);border-radius:0 8px 8px 0;color:var(--muted);font-size:14px}
+.meta{color:var(--muted);font-size:13px;margin:18px 0 8px}
+
+.book{display:grid;grid-template-columns:52px 1fr auto;gap:14px;padding:14px 4px;border-bottom:1px solid var(--line);align-items:start}
+.cover{width:52px;height:76px;border-radius:3px;background:linear-gradient(160deg,var(--indigo),#1e1b4b);color:#fff;display:grid;place-items:center;font:600 22px var(--serif);position:relative;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.book h3{font:600 19px/1.25 var(--serif);margin:0}
+.book .by{margin:2px 0 0;color:var(--ink)}
+.book .pub{color:var(--muted);font-size:13px;margin:2px 0 0}
+.rk{font:500 13px var(--sans);color:var(--muted);text-align:right;white-space:nowrap}
+.rk b{display:block;font-size:18px;color:var(--ink)}
+.src{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.src span{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
+.src .bm25{border-color:var(--c-bm25);color:var(--c-bm25)}
+.src .semantic{border-color:var(--c-semantic);color:var(--c-semantic)}
+mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
+.empty{padding:36px 8px;color:var(--muted)}
+.err{padding:14px 16px;border:1px solid #fca5a5;background:rgba(239,68,68,.08);border-radius:8px}
+
+/* compare */
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:18px}
+@media (max-width:1000px){.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.grid4{grid-template-columns:1fr}}
+.col{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 12px 6px;border-top:4px solid var(--cc)}
+.col h4{margin:0 0 2px;font:600 15px var(--sans)}
+.col .t{color:var(--muted);font-size:12px;margin-bottom:8px}
+.item{display:flex;gap:8px;padding:7px 6px;border-radius:6px;font-size:13.5px;line-height:1.3;cursor:default}
+.item .n{color:var(--muted);width:18px;flex:none;text-align:right}
+.item .ti{font-family:var(--serif);font-weight:600;font-size:15px}
+.item .au{color:var(--muted)}
+.item.hl{background:var(--indigo-soft)}
+.item.dim{opacity:.4}
+
+/* evaluation */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:22px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.stat .v{font:600 28px var(--serif)}
+.stat .l{color:var(--muted);font-size:13px}
+.two{display:grid;grid-template-columns:1.1fr 1fr;gap:22px}
+@media (max-width:900px){.two{grid-template-columns:1fr}}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:600;color:var(--muted);font-size:13px}
+td.best{font-weight:600;color:var(--good)}
+td.best::after{content:" ✓";font-weight:400}
+h2{font:600 22px var(--serif);margin:0 0 10px}
+h3.sec{font:600 17px var(--sans);margin:26px 0 8px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:13px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+select{font:400 14px var(--sans);padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+.note{color:var(--muted);font-size:13px;margin-top:10px;max-width:80ch}
+.warn{background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.5);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:14px}
+
+/* about */
+.about{max-width:80ch}
+.about h3{font:600 18px var(--serif);margin:22px 0 4px}
+.about p{margin:0 0 8px;color:var(--ink)}
+.about code{background:var(--indigo-soft);color:var(--indigo-ink);padding:1px 6px;border-radius:4px;font-size:13px}
+
+footer{background:#0f172a;color:#cbd5e1;padding:14px 0;font-size:14px}
+footer b{color:#a5b4fc;font-weight:500}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Book Search using Book-Crossing</h1>
+      <p class="sub" id="subtitle">Loading catalog…</p>
+    </div>
+    <span class="badge">Catalog Retrieval</span>
+  </div>
+  <nav role="tablist">
+    <button role="tab" data-tab="search" aria-selected="true">Search</button>
+    <button role="tab" data-tab="compare" aria-selected="false">Compare rankers</button>
+    <button role="tab" data-tab="eval" aria-selected="false">Evaluation</button>
+    <button role="tab" data-tab="about" aria-selected="false">How it works</button>
+  </nav>
+</div></header>
+
+<main><div class="wrap">
+
+<section class="panel active" id="panel-search">
+  <form class="searchbar" id="searchForm">
+    <input id="q" type="search" placeholder="Try an author, a title, or a topic" autocomplete="off" aria-label="Search the catalog">
+    <button type="submit">Search</button>
+  </form>
+  <div class="row">
+    <span class="hint">Ranking method</span>
+    <div class="seg" id="methodSeg"></div>
+    <select id="kSel" aria-label="Number of results"><option>10</option><option>20</option><option>30</option></select>
+  </div>
+  <div class="row" id="examples"></div>
+  <div class="explain" id="methodExplain"></div>
+  <div class="meta" id="resMeta"></div>
+  <div id="results"></div>
+</section>
+
+<section class="panel" id="panel-compare">
+  <form class="searchbar" id="cmpForm">
+    <input id="cq" type="search" placeholder="Same query, four rankers side by side" autocomplete="off" aria-label="Compare query">
+    <button type="submit">Compare</button>
+  </form>
+  <div class="row" id="cmpExamples"></div>
+  <p class="hint" style="margin:12px 0 0">Hover a book to see where every ranker placed it. Typo queries and topic queries show the biggest differences.</p>
+  <div class="grid4" id="cmpGrid"></div>
+</section>
+
+<section class="panel" id="panel-eval"><div id="evalBody"></div></section>
+
+<section class="panel" id="panel-about"><div class="about" id="aboutBody"></div></section>
+
+</div></main>
+
+<footer><div class="wrap"><b>Learning outcomes:</b> Metadata IR, Content-Based Filtering, Hybrid RRF Strategy</div></footer>
+
+<script>
+const METHODS = {tfidf:"TF-IDF", bm25:"BM25", semantic:"Semantic", hybrid:"Hybrid (RRF)"};
+const EXPLAIN = {
+  tfidf:"Counts how often query words appear in a book's metadata, down-weighting words that appear in many books. Exact words only.",
+  bm25:"Like TF-IDF, but saturates repeated words and corrects for record length. The standard lexical baseline.",
+  semantic:"A Sentence Transformer embeds the query and each book record into vectors; nearest vectors win. Tolerates typos and related wording.",
+  hybrid:"Reciprocal Rank Fusion merges the BM25 and Semantic rankings: each book scores 1/(60 + rank) from every list that contains it."
+};
+const COLORS = {tfidf:"var(--c-tfidf)", bm25:"var(--c-bm25)", semantic:"var(--c-semantic)", hybrid:"var(--c-hybrid)"};
+const EXAMPLES = ["stephen king","harry potter","the lord of the rings","agatha christie murder","cooking recipes","scary haunted house","romantic love story","tolkein"];
+let method = "hybrid", evalData = null, info = null;
+
+const $ = (s,r=document)=>r.querySelector(s);
+const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+async function api(path){
+  const r = await fetch(path);
+  if(!r.ok){ let m = r.statusText; try{ m=(await r.json()).detail||m }catch{} throw new Error(m) }
+  return r.json();
+}
+function hl(text, q){
+  const words = [...new Set((q||"").toLowerCase().split(/\W+/).filter(w=>w.length>1))];
+  let out = esc(text);
+  if(!words.length) return out;
+  const re = new RegExp("("+words.map(w=>w.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("|")+")","gi");
+  return out.replace(re,"<mark>$1</mark>");
+}
+
+/* tabs */
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x===b));
+  document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active",p.id==="panel-"+b.dataset.tab));
+  if(b.dataset.tab==="eval") loadEval();
+});
+
+/* search */
+function buildSeg(){
+  const seg=$("#methodSeg");
+  seg.innerHTML = Object.entries(METHODS).map(([k,v])=>`<button type="button" data-m="${k}" aria-pressed="${k===method}">${v}</button>`).join("");
+  seg.querySelectorAll("button").forEach(b=>b.onclick=()=>{method=b.dataset.m;buildSeg();doSearch()});
+  $("#methodExplain").textContent = EXPLAIN[method];
+}
+function bookHTML(b,q,method){
+  const chips = method==="hybrid" ? `<div class="src">${Object.entries(b.source_ranks).map(([n,r])=>`<span class="${n}">${METHODS[n]} #${r}</span>`).join("")}</div>` : "";
+  const init = esc((b.title||"?").replace(/^(the|a|an)\s+/i,"").charAt(0).toUpperCase());
+  const img = b.image ? `<img loading="lazy" src="${esc(b.image)}" alt="" onload="if(this.naturalWidth<=2)this.remove()" onerror="this.remove()">` : "";
+  const rating = b.n_ratings ? ` · ${b.avg_rating.toFixed(1)}/10 from ${b.n_ratings} ratings` : "";
+  return `<article class="book">
+    <div class="cover">${init}${img}</div>
+    <div><h3>${hl(b.title,q)}</h3>
+      <p class="by">${hl(b.author||"Unknown author",q)}</p>
+      <p class="pub">${hl(b.publisher,q)}${b.year?`, ${hl(String(b.year),q)}`:""}${rating}</p>${chips}</div>
+    <div class="rk"><b>#${b.rank}</b>score ${b.score}</div></article>`;
+}
+async function doSearch(){
+  const q=$("#q").value.trim(); $("#methodExplain").textContent = EXPLAIN[method];
+  if(!q){ $("#results").innerHTML=`<div class="empty">Type a query, or pick one of the examples above.</div>`; $("#resMeta").textContent=""; return }
+  try{
+    const d = await api(`/api/search?q=${encodeURIComponent(q)}&method=${method}&k=${$("#kSel").value}`);
+    $("#resMeta").textContent = `${d.results.length} results from ${d.label} in ${d.took_ms} ms`;
+    $("#results").innerHTML = d.results.length ? d.results.map(b=>bookHTML(b,q,method)).join("")
+      : `<div class="empty">No books matched “${esc(q)}” with ${esc(d.label)}. Words that are not in any record cannot match; try Semantic or Hybrid.</div>`;
+  }catch(e){ $("#results").innerHTML=`<div class="err">${esc(e.message)}</div>` }
+}
+$("#searchForm").onsubmit=e=>{e.preventDefault();doSearch()};
+$("#kSel").onchange=doSearch;
+function chips(el,target,fn){
+  el.innerHTML = EXAMPLES.map(x=>`<button type="button" class="chip">${esc(x)}</button>`).join("");
+  el.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{target.value=c.textContent;fn()});
+}
+
+/* compare */
+async function doCompare(){
+  const q=$("#cq").value.trim(); if(!q) return;
+  try{
+    const d = await api(`/api/compare?q=${encodeURIComponent(q)}&k=10`);
+    $("#cmpGrid").innerHTML = Object.keys(METHODS).map(m=>{
+      const run=d.runs[m];
+      return `<div class="col" style="--cc:${COLORS[m]}"><h4>${METHODS[m]}</h4><div class="t">${run.took_ms} ms</div>`+
+        (run.results.length? run.results.map(b=>`<div class="item" data-id="${b.doc_id}"><span class="n">${b.rank}</span><span><span class="ti">${esc(b.title)}</span><br><span class="au">${esc(b.author)}${b.year?`, ${b.year}`:""}</span></span></div>`).join("")
+        : `<div class="item"><span class="au">No match</span></div>`)+`</div>`}).join("");
+    const grid=$("#cmpGrid");
+    grid.querySelectorAll(".item[data-id]").forEach(it=>{
+      it.onmouseenter=()=>grid.querySelectorAll(".item[data-id]").forEach(o=>{const same=o.dataset.id===it.dataset.id;o.classList.toggle("hl",same);o.classList.toggle("dim",!same)});
+      it.onmouseleave=()=>grid.querySelectorAll(".item").forEach(o=>o.classList.remove("hl","dim"));
+    });
+  }catch(e){ $("#cmpGrid").innerHTML=`<div class="err" style="grid-column:1/-1">${esc(e.message)}</div>` }
+}
+$("#cmpForm").onsubmit=e=>{e.preventDefault();doCompare()};
+
+/* evaluation */
+function prChart(d){
+  const W=640,H=380,m={l:52,r:16,t:16,b:46},iw=W-m.l-m.r,ih=H-m.t-m.b;
+  const x=v=>m.l+v*iw, y=v=>m.t+(1-v)*ih;
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Precision-recall curves for each ranking method">`;
+  for(let i=0;i<=5;i++){const v=i/5;
+    s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${m.l-8}" y="${y(v)+4}" text-anchor="end" font-size="12" fill="var(--muted)">${v.toFixed(1)}</text>`;
+    s+=`<text x="${x(v)}" y="${H-m.b+18}" text-anchor="middle" font-size="12" fill="var(--muted)">${v.toFixed(1)}</text>`}
+  s+=`<text x="${m.l+iw/2}" y="${H-6}" text-anchor="middle" font-size="13" fill="var(--ink)">Recall</text>`;
+  s+=`<text transform="translate(14 ${m.t+ih/2}) rotate(-90)" text-anchor="middle" font-size="13" fill="var(--ink)">Precision (interpolated)</text>`;
+  for(const k of Object.keys(METHODS)){
+    const pts=d.recall_levels.map((r,i)=>`${x(r)},${y(d.pr_curve[k][i])}`).join(" ");
+    s+=`<polyline points="${pts}" fill="none" stroke="${COLORS[k]}" stroke-width="${k==="hybrid"?3.2:2}"/>`;
+    d.recall_levels.forEach((r,i)=>{s+=`<circle cx="${x(r)}" cy="${y(d.pr_curve[k][i])}" r="3" fill="${COLORS[k]}"><title>${METHODS[k]} · recall ${r.toFixed(1)} · precision ${d.pr_curve[k][i].toFixed(3)}</title></circle>`});
+  }
+  return s+"</svg>";
+}
+function metricsTable(rows,cols,fmtLat){
+  const best={}; cols.forEach(c=>{ if(c!=="latency_ms") best[c]=Math.max(...Object.values(rows).map(r=>r[c])) });
+  return `<table><thead><tr><th>Method</th>${cols.map(c=>`<th>${c==="latency_ms"?"Latency (ms)":c}</th>`).join("")}</tr></thead><tbody>`+
+    Object.entries(rows).map(([m,r])=>`<tr><td>${METHODS[m]}</td>${cols.map(c=>{
+      const v=r[c]; const isBest = c in best && Math.abs(v-best[c])<1e-12;
+      return `<td class="${isBest?"best":""}">${c==="latency_ms"?v.toFixed(1):v.toFixed(3)}</td>`}).join("")}</tr>`).join("")+`</tbody></table>`;
+}
+async function loadEval(){
+  if(evalData) return;
+  const body=$("#evalBody");
+  try{ evalData = await api("/api/metrics") }catch(e){ body.innerHTML=`<div class="err">${esc(e.message)}</div>`; return }
+  const d=evalData, cols=[...d.metric_order,"latency_ms"], o=d.overall;
+  const top=(c)=>{const [m,v]=Object.entries(o).sort((a,b)=>b[1][c]-a[1][c])[0];return {m,v}};
+  const stat=(c,l)=>{const t=top(c);return `<div class="stat"><div class="v">${t.v[c].toFixed(3)}</div><div class="l">Best ${l}: ${METHODS[t.m]}</div></div>`};
+  const fallback = d.meta.encoder_kind==="lsa-fallback";
+  const types=Object.keys(d.by_type);
+  body.innerHTML = `
+    ${fallback?`<div class="warn"><b>Heads up:</b> the semantic ranker here is the offline LSA fallback, not a Sentence Transformer. Install <code>sentence-transformers</code> and rebuild for the real neural results.</div>`:""}
+    <div class="cards">${stat("P@10","Precision@10")}${stat("MAP","MAP")}${stat("nDCG@10","nDCG@10")}${stat("R@100","Recall@100")}</div>
+    <div class="two">
+      <div><h2>Performance comparison</h2><div class="scroll">${metricsTable(o,cols)}</div>
+        <p class="note">${d.meta.n_queries} queries over ${d.meta.n_documents.toLocaleString()} books. Semantic model: ${esc(d.meta.encoder)}. Relevance is derived from catalog metadata (see “How it works”). Precision@10 is capped below 1.0 for queries with fewer than 10 relevant books.</p></div>
+      <div><h2>Precision–recall</h2>${prChart(d)}
+        <div class="legend">${Object.keys(METHODS).map(k=>`<span><i style="background:${COLORS[k]}"></i>${METHODS[k]}</span>`).join("")}</div></div>
+    </div>
+    <h3 class="sec">Results by query type</h3>
+    <div class="row" style="margin:0 0 8px"><select id="typeSel" aria-label="Query type">${types.map(t=>`<option value="${t}">${t.replace("_"," + ")} (${d.meta.queries_per_type[t]} queries)</option>`).join("")}</select></div>
+    <div class="scroll" id="typeTable"></div>
+    <p class="note" id="typeNote"></p>`;
+  const notes={author:"Author name only. Every book by that author is relevant.",
+    title:"Two or three consecutive title words. Lexical rankers are strongest here because the judgments are word-based.",
+    title_author:"A title word plus the author's surname, as a user searching from memory would type.",
+    typo:"The same queries with a typing mistake. Exact-word rankers lose the misspelled term; embeddings recover it. This is where hybrid fusion earns its keep."};
+  const draw=()=>{const t=$("#typeSel").value;$("#typeTable").innerHTML=metricsTable(d.by_type[t],d.metric_order);$("#typeNote").textContent=notes[t]||""};
+  $("#typeSel").onchange=draw; draw();
+}
+
+/* about */
+$("#aboutBody").innerHTML = `
+  <h2>How it works</h2>
+  <h3>1. Preprocessing</h3><p>Each book record (title, author, publisher, year) is cleaned (HTML entities, accents, case), tokenized, stripped of stop words and stemmed with the Porter stemmer. Queries go through the identical pipeline.</p>
+  <h3>2. Metadata inverted index</h3><p>One sparse term × book matrix. Each row is a postings list. Fields are boosted: title ×3, author ×2, publisher ×1, year ×1.</p>
+  <h3>3. Rankers</h3><p><code>TF-IDF</code> and <code>BM25</code> read postings directly. <code>Semantic</code> embeds each record with a Sentence Transformer (all-MiniLM-L6-v2) and ranks by cosine similarity.</p>
+  <h3>4. Hybrid fusion</h3><p><code>score(d) = Σ 1 / (60 + rank)</code> across the BM25 and Semantic lists. No score calibration needed because RRF only uses ranks.</p>
+  <h3>5. Evaluation</h3><p>Book-Crossing has no queries or relevance labels, so judgments are derived from metadata: author queries, title-phrase queries, title+author queries and typo queries. Metrics: Precision@10, Recall@10/@100, MAP, nDCG@10, MRR, latency.</p>`;
+
+/* boot */
+(async()=>{
+  buildSeg(); chips($("#examples"),$("#q"),doSearch); chips($("#cmpExamples"),$("#cq"),doCompare);
+  try{ info = await api("/api/info");
+    $("#subtitle").textContent = `${info.books.toLocaleString()} books · ${info.vocabulary.toLocaleString()} indexed terms · semantic model: ${info.encoder_kind==="lsa-fallback"?"LSA fallback":info.encoder.split("/").pop()}`;
+  }catch(e){ $("#subtitle").textContent="Index not loaded"; $("#results").innerHTML=`<div class="err">${esc(e.message)}</div>` }
+  doSearch();
+})();
+</script>
+</body>
+</html>
